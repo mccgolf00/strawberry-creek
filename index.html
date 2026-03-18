@@ -4,133 +4,91 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
     <title>Strawberry Creek - Sheet-Tee</title>
-    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #1a4a2e; font-family: Georgia, serif; color: #f0ead6; }
+        body { background: #1a4a2e; font-family: Georgia, serif; color: #f0ead6; margin: 0; padding: 0; }
         .gold { color: #d4af37; }
-        .nav-bar { display: flex; background: rgba(0,0,0,0.3); border-bottom: 1px solid #d4af37; }
-        .nav-btn { flex: 1; padding: 18px; text-align: center; font-size: 11px; text-transform: uppercase; color: rgba(240,234,214,0.4); cursor: pointer; }
-        .nav-btn.active { color: #d4af37; border-bottom: 2px solid #d4af37; }
-        .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 20px; margin: 15px; }
-        .player-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .btn-gold { background: #d4af37; color: #1a4a2e; border: none; padding: 14px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; text-transform: uppercase; }
+        .card { background: rgba(255,255,255,0.05); border: 1px solid #d4af37; border-radius: 12px; padding: 20px; margin: 20px; }
+        .nav { display: flex; border-bottom: 1px solid #d4af37; background: rgba(0,0,0,0.2); }
+        .nav-item { flex: 1; padding: 15px; text-align: center; cursor: pointer; text-transform: uppercase; font-size: 12px; }
+        .active { border-bottom: 3px solid #d4af37; color: #d4af37; }
+        input[type="checkbox"] { width: 20px; height: 20px; accent-color: #d4af37; }
+        .btn { background: #d4af37; color: #1a4a2e; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; }
     </style>
 </head>
 <body>
     <div id="root"></div>
-
     <script type="text/babel">
-        // --- CONFIGURATION ---
-        const CONFIG = {
-            clubId: "strawberry",
-            clubName: "Strawberry Creek",
-            tagline: "Private Golf & Social Club",
-            logoUrl: "./assets/logo.png",
-            groupPassword: "golf", 
-            supabaseUrl: "https://nwizmbkurxxqcfzmrzrx.supabase.co",
-            supabaseKey: "PASTE_YOUR_STRAWBERRY_ANON_KEY_HERE" 
-        };
-
         const { useState, useEffect } = React;
-        const sb = supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey);
+        // USE YOUR ORIGINAL STRAWBERRY KEYS HERE
+        const sb = supabase.createClient("https://nwizmbkurxxqcfzmrzrx.supabase.co", "YOUR_ACTUAL_STRAWBERRY_KEY");
 
-        function SheetTee() {
-            const [isAuth, setIsAuth] = useState(localStorage.getItem("st_auth_strawberry") === "true");
+        function App() {
             const [view, setView] = useState("signup");
-            const [pass, setPass] = useState("");
             const [roster, setRoster] = useState([]);
             const [signups, setSignups] = useState({});
 
             useEffect(() => {
-                if (isAuth) {
-                    fetchData();
-                    // Real-time listener so updates show instantly
-                    const sub = sb.channel('any').on('postgres_changes',{event:'*',schema:'public',table:'store'}, fetchData).subscribe();
-                    return () => sb.removeChannel(sub);
-                }
-            }, [isAuth]);
+                fetchData();
+            }, []);
 
             const fetchData = async () => {
-                // The critical fix: we filter by 'strawberry'
+                // This 'eq' filter is the ONLY thing needed to fix the "Green Screen"
                 const { data } = await sb.from('store').select('*').eq('club_id', 'strawberry');
-                const ros = data?.find(d => d.key === 'roster')?.value || [];
-                const sig = data?.find(d => d.key === 'signups')?.value || {};
-                setRoster(ros);
-                setSignups(sig);
+                setRoster(data?.find(d => d.key === 'roster')?.value || []);
+                setSignups(data?.find(d => d.key === 'signups')?.value || {});
             };
 
             const toggle = async (name, day) => {
                 const updated = { ...signups };
                 if (!updated[day]) updated[day] = [];
                 updated[day] = updated[day].includes(name) ? updated[day].filter(n => n !== name) : [...updated[day], name];
-                
-                await sb.from('store').upsert({ 
-                    key: 'signups', 
-                    value: updated, 
-                    club_id: 'strawberry' 
-                });
+                await sb.from('store').upsert({ key: 'signups', value: updated, club_id: 'strawberry' });
+                setSignups(updated);
             };
 
-            if (!isAuth) return (
-                <div style={{height:'100vh', display:'flex', flexDirection:'column', justifyContent:'center', padding:40, textAlign:'center'}}>
-                    <img src={CONFIG.logoUrl} style={{width:100, margin:'0 auto 20px'}} />
-                    <h1 style={{marginBottom:10}}>{CONFIG.clubName}</h1>
-                    <input type="password" placeholder="Password" style={{background:'none', border:'1px solid #d4af37', padding:15, color:'#fff', borderRadius:8, textAlign:'center', width:'100%', marginBottom:15}} 
-                           onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==='Enter' && pass === CONFIG.groupPassword && (localStorage.setItem("st_auth_strawberry","true"), setIsAuth(true))} />
-                    <button className="btn-gold" onClick={() => pass === CONFIG.groupPassword ? (localStorage.setItem("st_auth_strawberry","true"), setIsAuth(true)) : alert("Denied")}>Unlock Clubhouse</button>
-                </div>
-            );
-
             return (
-                <div style={{maxWidth:500, margin:'0 auto'}}>
-                    <header style={{padding:40, textAlign:'center'}}>
-                        <img src={CONFIG.logoUrl} style={{width:80}} />
-                        <h2 style={{marginTop:10}}>{CONFIG.clubName}</h2>
-                    </header>
-                    <nav className="nav-bar">
-                        <div className={`nav-btn ${view==='signup'?'active':''}`} onClick={()=>setView('signup')}>Sign Up</div>
-                        <div className={`nav-btn ${view==='tally'?'active':''}`} onClick={()=>setView('tally')}>Who's In</div>
-                    </nav>
-                    <main>
-                        {view === 'signup' && (
-                            <div className="card">
-                                <h3 className="gold" style={{fontSize:11, textAlign:'center', marginBottom:20, letterSpacing:2}}>WEEKEND ROSTER</h3>
-                                {roster.length === 0 ? <p style={{textAlign:'center', opacity:0.5}}>Loading names...</p> : 
-                                 roster.map(p => (
-                                    <div key={p} className="player-row">
-                                        <span>{p}</span>
-                                        <div style={{display:'flex', gap:20}}>
-                                            <label style={{textAlign:'center'}}><div style={{fontSize:9, opacity:0.5}}>SAT</div><input type="checkbox" checked={signups.Sat?.includes(p)} onChange={()=>toggle(p,'Sat')}/></label>
-                                            <label style={{textAlign:'center'}}><div style={{fontSize:9, opacity:0.5}}>SUN</div><input type="checkbox" checked={signups.Sun?.includes(p)} onChange={()=>toggle(p,'Sun')}/></label>
-                                        </div>
+                <div style={{maxWidth: 500, margin: '0 auto'}}>
+                    <div style={{textAlign: 'center', padding: '30px 0'}}>
+                        <img src="./assets/logo.png" style={{width: 80}} />
+                        <h2>Strawberry Creek</h2>
+                    </div>
+                    <div className="nav">
+                        <div className={`nav-item ${view==='signup'?'active':''}`} onClick={()=>setView('signup')}>Sign Up</div>
+                        <div className={`nav-item ${view==='tally'?'active':''}`} onClick={()=>setView('tally')}>Who's In</div>
+                    </div>
+                    {view === 'signup' ? (
+                        <div className="card">
+                            <h3 className="gold" style={{textAlign: 'center'}}>WEEKEND ROSTER</h3>
+                            {roster.map(p => (
+                                <div key={p} style={{display:'flex', justifyContent:'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
+                                    <span>{p}</span>
+                                    <div>
+                                        <label style={{marginRight: 10}}>SAT <input type="checkbox" checked={signups.Sat?.includes(p)} onChange={()=>toggle(p,'Sat')}/></label>
+                                        <label>SUN <input type="checkbox" checked={signups.Sun?.includes(p)} onChange={()=>toggle(p,'Sun')}/></label>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                        {view === 'tally' && (
-                            <div className="card">
-                                {['Sat', 'Sun'].map(day => (
-                                    <div key={day} style={{marginBottom:20}}>
-                                        <h4 className="gold" style={{fontSize:12, borderBottom:'1px solid rgba(212,175,55,0.2)', paddingBottom:5}}>{day.toUpperCase()}</h4>
-                                        <div style={{display:'flex', flexWrap:'wrap', gap:8, marginTop:10}}>
-                                            {signups[day]?.length > 0 ? signups[day].map(n => <span key={n} style={{background:'rgba(212,175,55,0.1)', padding:'5px 10px', borderRadius:6, fontSize:13}}>{n}</span>) : <span style={{opacity:0.3}}>No one yet</span>}
-                                        </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="card">
+                            {['Sat', 'Sun'].map(day => (
+                                <div key={day} style={{marginBottom: 20}}>
+                                    <h4 className="gold">{day.toUpperCase()}</h4>
+                                    <div style={{display:'flex', flexWrap:'wrap', gap: 10}}>
+                                        {signups[day]?.map(n => <span key={n} style={{background:'rgba(212,175,55,0.1)', padding:'5px 10px', borderRadius:5}}>{n}</span>)}
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </main>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             );
         }
-        const root = ReactDOM.createRoot(document.getElementById("root"));
-        root.render(<SheetTee />);
+        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     </script>
 </body>
 </html>
